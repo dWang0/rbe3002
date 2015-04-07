@@ -21,7 +21,6 @@ from nav_msgs.msg import MapMetaData
 from nav_msgs.msg import GridCells
 from std_msgs.msg import Header
 from std_msgs.msg import Float64
-
 class Node:
     def __init__(self, x, y, theta):
         self.z = 0
@@ -34,11 +33,16 @@ class Cost:
         self.g = costSoFar
         self.h = heuristic
         self.f = costSoFar + heuristic
+class ClosedNode:
+    def __init__(self, node, costSoFar, backNode):
+        self.g = costSoFar
+        self.node = node
+        self.path = backNode
 class Frontier:
     def __init__(self, node, cost, path):
         self.node = node#this is a Node
         self.cost = cost#this is a Cost
-        self.path = path# list of Nodes
+        self.path = path# is the past new
 global disPerGrid#constant on the length of gridcells
 disPerGrid = .2
 global disPerdeg #constant on the length traveled per degrees spun
@@ -47,14 +51,14 @@ def aStar(rmap, start, end):# example call aStar(testmap, Node(4,0,46), Node(2,0
     frontierList = list()
     closedList =list()
     startGrid= startToGrid(start)
-    startOfAllList = list()
-    startOfAllList.append(start)
+    startOfAllList = 0
+
     frontierList.append(Frontier(startGrid,Cost(0, calculateHeuristic(startGrid, end)),startOfAllList))
     error = 0
     done = 0
     if(rmap[start.x][start.y]==100 or rmap[end.x][end.y] == 100):
         error = 1
-    
+
     while(done == 0 and error == 0):
         currentNode = frontierList.pop(0)
         print"x: %f y: %f t: %f" % (currentNode.node.x, currentNode.node.y, currentNode.node.theta)
@@ -90,47 +94,61 @@ def aStar(rmap, start, end):# example call aStar(testmap, Node(4,0,46), Node(2,0
         if(not(newx < 0 or newx >= len(rmap) or newy < 0 or newy >= len(rmap[0])) and (rmap[newx][newy]==0) and (rmap[newx-dx][newy]==0) and (rmap[newx][newy-dy]==0)):
             neighborNodes.append(Node(currentNode.node.x+dx, currentNode.node.y+dy, currentNode.node.theta))
         for node in neighborNodes:
-            if(not(nodeInList(closedList, node)) and (rmap[node.x][node.y]==0)):
+            closedList = updateClosedList(closedList, node,currentNode.cost.g+changeInNode(currentNode.node, node), currentNode.path )
+            if(not(nodeInList(closedList, node))):
                 newCost = Cost(currentNode.cost.g+changeInNode(currentNode.node, node),calculateHeuristic(node, end))
-                newPath = []
-                newPath.extend(currentNode.path)
-                newPath.append(currentNode.node)
-                frontierList = addFrontier(frontierList, Frontier(node, newCost, newPath))
-        closedList.append(currentNode.node)
+                newClosedNode = ClosedNode(currentNode.node,currentNode.cost.g,currentNode.path)
+                frontierList = addFrontier(frontierList, Frontier(node, newCost, newClosedNode))
+        closedList.append(newClosedNode)
         if(len(frontierList) == 0):
             error = 1
         elif(frontierList[0].node.x==end.x and frontierList[0].node.y==end.y):
-            done = 1
-    
+            done =1
+       
+
     finalPath = []
     if(error == 1):
         finalPath.append(start)
     else:
         finalFrontier = frontierList.pop(0)
-        finalPath.extend(finalFrontier.path)
-        finalPath.append(finalFrontier.node)
-        finalPath.append(end)
+        finalNode = finalFrontier.path
+        while(not(finalNode.path == 0)):
+            finalPath.insert(0, finalNode.node)
+            finalNode = finalNode.path
+        finalPath.insert(0, start)
     return finalPath
 def printPath(path):
     step = 1
     for n in path:
         print"step %f x: %f y: %f t: %f" % (step, n.x, n.y, n.theta)
         step = step + 1
-	
+
 def nodeInList(nodeList, node):
     isIn = 0
     for n in nodeList:
-        if(n.x == node.x and n.y == node.y and n.theta == node.theta):
+        if(n.node.x == node.x and n.node.y == node.y and n.node.theta == node.theta):
             isIn = 1
     return isIn
-
+def updateClosedList(closedList, node, g, path):
+    insert = -1
+    counter = 0
+    for n in closedList:
+        if(n.node.x == node.x and n.node.y == node.y and n.node.theta == node.theta):
+            if(n.g > g):
+                insert = counter
+        counter += 1
+    if(insert>-1):
+        closedList[insert].path = path
+        closedList[insert].g = g
+        print "cooo"
+    return closedList
 def changeInNode(startNode, endNode):
     dx = endNode.x - startNode.x
     dy = endNode.y - startNode.y
     dtheta = (endNode.theta - startNode.theta + 360)%360
     if(dtheta>180):
         dtheta=360 - dtheta
-    return (((dx**2 + dy**2)**.5)*disPerGrid+dtheta*disPerdeg)
+    return (((dx**2 + dy**2)**.5)*disPerGrid+abs(dtheta*disPerdeg))
 def addFrontier(frontierList, frontier):
     i = 0# what index it is in the list
     insert = -1#where it will insert the frontier
@@ -144,20 +162,21 @@ def addFrontier(frontierList, frontier):
             pop = i
         if (nodeEqual(frontier.node, f.node) and not(frontier.cost.f < f.cost.f)):
             smaller = 0
+    if(pop>-1):
+        frontierList.pop(pop)
     if(smaller == 1):
         if(insert>-1):
             frontierList.insert(insert, frontier)
         else:
             frontierList.append(frontier)
-    if(pop>-1):
-        frontierList.pop(pop)
+    
     return frontierList
 def nodeEqual(nodeA, nodeB):
     if(nodeA.x == nodeB.x and nodeA.y == nodeB.y and nodeA.theta == nodeB.theta):
         return 1
     else:
         return 0
-            
+
 def startToGrid(start):
     if(abs(start.theta) <= 22.5 or abs(start.theta) >= 337.5):
         return Node(start.x, start.y, 0)
@@ -231,16 +250,23 @@ def listToMapXY(rlist, width, height):
         rowList =[]
         ycounter += 1
     return rmap
-
-# example of everything all together 
+def gridNodesToMeter(nodeList, xOffset, yOffset, rez):
+    workingList =[]
+    workingList.extend(nodeList)
+    for node in workingList:
+        node.x = (node.x*rez+xOffset)
+        node.y = (node.y*rez+yOffset)
+    return workingList
+# example of everything all together
 #printPath(generateWaypoints(aStar(listToMapXY(rvizmap, 37, 37), Node(1,1,46), Node(35,35,0))))
-# ^ prints steps out to console    
+# ^ prints steps out to console
 #               ^ takes all points of path a sorts out only point that are improtant i.e. when turning is required
 #                              ^finds path and returns a list of nodes of all nodes traveled
 #                                        ^ turns a map in list form into a 2d map
 #                                                                     ^start node (x, y, theta)
 #                                                                                  ^ end node (x, y, theta)
 #This function sequentially calls methods to perform a trajectory.
+
 def executeTrajectory():
 
 	#time.sleep(.1)
@@ -439,13 +465,6 @@ def publishGrid (nodeList):
         gridCell.header.frame_id = "map"
         gridCell.cells = nodeList
 	pub.publish(gridCell)
-def gridNodesToMeter(nodeList, xOffset, yOffset, rez):
-    workingList =[]
-    workingList.extend(nodeList)
-    for node in workingList:
-        node.x = (node.x*rez+xOffset)
-        node.y = (node.y*rez+yOffset)
-    return workingList
          
 def publishTwist (u,w):
 	pub = rospy.Publisher('cmd_vel_mux/input/teleop', Twist)
@@ -490,7 +509,9 @@ if __name__ == '__main__':
     time.sleep(.5)
     #print listToMapXY(rvizmap, 37, 37)
     #printPath(generateWaypoints(
-    grid = gridNodesToMeter(aStar(listToMapXY(rvizmap, 37, 37), Node(1,1,46), Node(26,29,0)),xMapOffset, yMapOffset, .2)#))
+    grid =aStar(listToMapXY(rvizmap, 37, 37), Node(1,1,46), Node(26,29,0))#))
+    printPath(grid)
+    grid = gridNodesToMeter(grid,xMapOffset, yMapOffset, .2)
     while 1:
         publishGrid (grid)
         time.sleep(.5)
