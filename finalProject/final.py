@@ -41,7 +41,6 @@ def poseTogridNode(x, y, xOffset, yOffset, rez):
     return Node(int((x-xOffset)/rez), int((y-yOffset)/rez))
 
 
-
 #this checks to see what known nodes have neighbors
 #that are unknown. Then the goal is set to 
 def isNear(currentNode):
