@@ -41,6 +41,7 @@ def poseTogridNode(x, y, xOffset, yOffset, rez):
     return Node(int((x-xOffset)/rez), int((y-yOffset)/rez))
 
 
+
 #this checks to see what known nodes have neighbors
 #that are unknown. Then the goal is set to 
 def isNear(currentNode):
@@ -49,9 +50,12 @@ def isNear(currentNode):
     a = []
     rotate(333)
     
-    while (safeOff is False) and (not exploreList):
-        a = BFS(currentnode)
-         
+    while (safeOff is True) and (not exploreList):
+        a = BFS(currentNode)
+        print "in BFS while"
+    
+    print "after while loop"
+    print a     
     if len(a) is 0:
         rospy.sleep(100000)
     else:
@@ -64,8 +68,8 @@ def isNear(currentNode):
 def publishEnd (frontierNode, name):
     pub = rospy.Publisher(name, PoseWithCovarianceStamped, queue_size=1)
     poseStart = PoseWithCovarianceStamped()
-    poseStart.pose.x = frontierNode.x
-    poseStart.pose.y = frontierNode.x
+    poseStart.pose.pose.position.x = frontierNode.x
+    poseStart.pose.pose.position.y = frontierNode.x
     poseStart.header.frame_id = "map"
     pub.publish(poseStart)
 	
@@ -74,8 +78,8 @@ def publishEnd (frontierNode, name):
 def publishStart (currentNode, name):
 	pub = rospy.Publisher(name, PoseStamped, queue_size=1)
 	poseEnd = PoseStamped()
-        poseEnd.pose.x = currentNode.x
-        poseEnd.pose.y = currentNode.x
+        poseEnd.pose.position.x = currentNode.x
+        poseEnd.pose.position.y = currentNode.x
         poseEnd.header.frame_id = "map"
 	pub.publish(poseEnd)
    
@@ -85,16 +89,17 @@ def publishStart (currentNode, name):
 def BFS(start):
     global safeOff
     visitedNodes = []
-    queue = deque([start])
+    queue = ([start])
     nodeUnknown = []
     while len(queue) > 0:
         anode = queue.pop()
-        if anode in visitednodes:
+        if anode in visitedNodes:
             continue
         
-        visitedNodes.add(start)
-        if (rmap[anode.x][anode.y] is -1):
+        visitedNodes.append(start)
+        if (rvizmap[int(anode.x * anode.y)] is -1):
             nodeUnknown.append(anode)
+            safeOff = False
             return nodeUnknown
         
         for nodes in anode.getBuds:
@@ -207,21 +212,25 @@ def driveStraight(speed, distance):
 
 #This rotates the robot by the given angle
 def rotate(angle):
-	poleRate = .1
-	tol = .2
-	
-	thetaStart = theta
-	
-	print "theta: %f" % (theta)
-	
-	thetaGoal = (((thetaStart+angle)+3.14)%(2*3.14))-3.14
-	print "thetaGoal: %f" % (thetaGoal)
-	
-	while(theta < thetaGoal -tol or theta > thetaGoal+tol):
-		publishTwist(0, angle/abs(angle)/2)
-		print "theta: %f" % (theta)
-		time.sleep(poleRate)
-	publishTwist(0,0)
+    print "rotate"
+    poleRate = .1
+    tol = .05
+
+    thetaStart = theta
+
+    print "theta: %f" % (theta)
+    
+    thetaGoal = (((thetaStart+angle)+3.14)%(2*3.14))-3.14
+    print "thetaGoal: %f" % (thetaGoal)
+
+    while(theta < thetaGoal -tol or theta > thetaGoal+tol):
+        print "current: ", theta
+        print "desired: ", thetaGoal
+        publishTwist(0, -.1)
+        print "theta: %f" % (theta)
+        time.sleep(poleRate)
+
+    publishTwist(0,0)
 
        
        
@@ -253,6 +262,8 @@ def OdomCallBack(data):
     y = py
     theta = yaw
     
+    
+    
 #map callback 
 def mapCallback(data):
     global xMapOffset
@@ -281,8 +292,6 @@ def mapCallback(data):
     walls = gridNodesToPose(rvizToWallList(rmap.list, rmap.width),xMapOffset, yMapOffset, rmap.rez)
     floor = gridNodesToPose(rvizToNodeList(rmap.list, rmap.width),xMapOffset, yMapOffset, rmap.rez)
     
-    
-    isNear(currentLoc)
     
     mapBeingMade = 0
     
@@ -362,6 +371,7 @@ def totheFrontiersAndBeyond():
     global exploreList
     global listener
     global safeOff
+    global x , y
     safeOff = True
     exploreList = []
     walls = []
@@ -376,7 +386,8 @@ def totheFrontiersAndBeyond():
     start_sub =rospy.Subscriber("/initialpose", PoseWithCovarianceStamped, startCallback)
     odom_sub = rospy.Subscriber("odom",Odometry, OdomCallBack)
     time.sleep(.5)
-    
+    currentLoc = Node(x,y)
+    isNear(currentLoc)
    
     while True:
         
