@@ -48,18 +48,20 @@ def isNear(currentNode):
     print "In nodes"
     global exploreList
     a = []
-    rotate(333)
+    rotate(10)
     
     while (safeOff is True) and (not exploreList):
         a = BFS(currentNode)
         print "in BFS while"
     
     print "after while loop"
-    print a     
-    if len(a) is 0:
-        rospy.sleep(100000)
+    print a[0].x , a[0].y     
+    if (not a):
+        print "sleep"
+        rospy.sleep(100000)        
     else:
         endNode = a[0]
+        print "jere"
         publishStart(currentNode, '/start')
         publishEnd(endNode, '/frontierNode')
     
